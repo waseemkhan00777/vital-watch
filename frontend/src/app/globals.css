@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: 13 148 136;
+  --color-primary-foreground: 255 255 255;
+  --color-critical: 220 38 38;
+  --color-high: 234 88 12;
+  --color-normal: 22 163 74;
+  --radius: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+body {
+  @apply bg-surface-paper text-slate-800 antialiased;
+}
+
+/* Stagger delay utilities */
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+.animate-delay-400 { animation-delay: 400ms; }
+.animate-delay-500 { animation-delay: 500ms; }
+.animate-delay-600 { animation-delay: 600ms; }
+
+/* Accessible focus rings */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-primary-500;
+}
+
+/* Healthcare card – hover lift and shadow */
+.card-clinical {
+  @apply rounded-xl border border-slate-200/80 bg-surface-card shadow-card transition-all duration-300 ease-out;
+}
+.card-clinical:hover {
+  @apply border-slate-200 shadow-elevated;
+}
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.03);
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-xl bg-primary-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-250 ease-out hover:bg-primary-600 hover:shadow-glow-sm focus-visible:outline-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500/25 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-250 ease-out hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500/20 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+}
+
+.input-field {
+  @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-800 placeholder-slate-400 transition-all duration-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 focus:outline-none;
+}
+
+.badge-critical {
+  @apply inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800;
+}
+
+.badge-high {
+  @apply inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800;
+}
+
+.badge-normal {
+  @apply inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800;
+}
