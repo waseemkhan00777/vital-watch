@@ -1,2 +1,9 @@
 # Dependencies
 node_modules/
+
+# .NET
+backend/**/bin/
+backend/**/obj/
+backend/**/.vs/
+backend/**/*.user
+*.log

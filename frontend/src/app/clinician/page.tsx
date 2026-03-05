@@ -1,37 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
-
-// Mock alerts with SLA – PRD §5.3 (1h critical, 4h high)
-const MOCK_ALERTS = [
-  {
-    id: "1",
-    patientName: "John Patient",
-    vitalType: "Blood pressure",
-    severity: "critical" as const,
-    state: "flagged" as const,
-    value: "188/102",
-    unit: "mmHg",
-    createdAt: "2025-03-03T09:00:00Z",
-    slaDueAt: "2025-03-03T10:00:00Z",
-    clinicalNote: "",
-  },
-  {
-    id: "2",
-    patientName: "Jane Doe",
-    vitalType: "Blood glucose",
-    severity: "high" as const,
-    state: "acknowledged" as const,
-    value: "268",
-    unit: "mg/dL",
-    createdAt: "2025-03-03T08:00:00Z",
-    slaDueAt: "2025-03-03T12:00:00Z",
-    clinicalNote: "Patient to repeat test in 2h",
-  },
-];
+import { alertsApi } from "@/lib/api";
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -47,6 +21,12 @@ function formatDate(iso: string) {
   });
 }
 
+function formatValue(a: { value: number; valueSecondary?: number | null; unit: string; vitalType: string }) {
+  if (a.vitalType === "blood_pressure" && a.valueSecondary != null)
+    return `${a.value}/${a.valueSecondary}`;
+  return `${a.value} ${a.unit}`;
+}
+
 function getSlaStatus(slaDueAt: string) {
   const now = new Date();
   const due = new Date(slaDueAt);
@@ -60,10 +40,28 @@ export default function ClinicianAlertsPage() {
   const [filter, setFilter] = useState<"all" | "critical" | "high">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const queryClient = useQueryClient();
 
-  const alerts = MOCK_ALERTS.filter(
+  const { data: alerts = [], isLoading, error } = useQuery({
+    queryKey: ["alerts", "clinician"],
+    queryFn: () => alertsApi.list({ limit: 100 }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, state, clinicalNote }: { id: string; state?: string; clinicalNote?: string }) =>
+      alertsApi.update(id, { state, clinicalNote }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      setNote("");
+    },
+  });
+
+  const filteredAlerts = alerts.filter(
     (a) => filter === "all" || a.severity === filter
   );
+  const selected = selectedId
+    ? alerts.find((a) => a.id === selectedId)
+    : null;
 
   return (
     <>
@@ -95,52 +93,64 @@ export default function ClinicianAlertsPage() {
             title="Alert queue"
             description="Priority by severity; time to SLA breach shown."
           />
-          <div className="space-y-3">
-            {alerts.map((a, i) => {
-              const sla = getSlaStatus(a.slaDueAt);
-              return (
-                <div
-                  key={a.id}
-                  className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
-                    selectedId === a.id
-                      ? "border-primary-500 bg-primary-50/50 shadow-sm ring-1 ring-primary-500/20"
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/80"
-                  }`}
-                  style={{
-                    animation: "fade-in-up 0.4s ease-out forwards",
-                    animationDelay: `${100 + i * 50}ms`,
-                    opacity: 0,
-                  }}
-                  onClick={() => setSelectedId(a.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelectedId(a.id);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-slate-900">{a.patientName}</p>
-                      <p className="text-sm text-slate-600">
-                        {a.vitalType} {a.value} {a.unit}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {formatDate(a.createdAt)}
-                      </p>
+          {isLoading && <p className="text-sm text-slate-600">Loading…</p>}
+          {error && (
+            <p className="text-sm text-red-600">
+              {error instanceof Error ? error.message : "Failed to load alerts."}
+            </p>
+          )}
+          {!isLoading && !error && (
+            <div className="space-y-3">
+              {filteredAlerts.length === 0 ? (
+                <p className="text-sm text-slate-500">No alerts.</p>
+              ) : (
+                filteredAlerts.map((a, i) => {
+                  const sla = getSlaStatus(a.slaDueAt);
+                  return (
+                    <div
+                      key={a.id}
+                      className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
+                        selectedId === a.id
+                          ? "border-primary-500 bg-primary-50/50 shadow-sm ring-1 ring-primary-500/20"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/80"
+                      }`}
+                      style={{
+                        animation: "fade-in-up 0.4s ease-out forwards",
+                        animationDelay: `${100 + i * 50}ms`,
+                        opacity: 0,
+                      }}
+                      onClick={() => setSelectedId(a.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedId(a.id);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-slate-900">{a.patientName ?? a.patientId}</p>
+                          <p className="text-sm text-slate-600">
+                            {a.vitalType} {formatValue(a)}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {formatDate(a.createdAt)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge severity={a.severity as "critical" | "high" | "moderate" | "normal"}>{a.severity}</Badge>
+                          <Badge severity={sla.severity}>{sla.label}</Badge>
+                          <Badge severity="neutral">{a.state}</Badge>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge severity={a.severity}>{a.severity}</Badge>
-                      <Badge severity={sla.severity}>{sla.label}</Badge>
-                      <Badge severity="neutral">{a.state}</Badge>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </Card>
 
         <Card className="animate-fade-in-up opacity-0" style={{ animationDelay: "120ms", animationFillMode: "forwards" }}>
@@ -148,47 +158,63 @@ export default function ClinicianAlertsPage() {
             title="Alert detail"
             description="Add note, acknowledge, or mark resolved."
           />
-          {selectedId ? (
-            (() => {
-              const a = MOCK_ALERTS.find((x) => x.id === selectedId);
-              if (!a) return null;
-              return (
-                <div className="animate-slide-in-right space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">
-                      {a.patientName} · {a.vitalType}
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {a.value} {a.unit}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Flagged {formatDate(a.createdAt)} · SLA due{" "}
-                      {formatDate(a.slaDueAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">
-                      Clinical note
-                    </label>
-                    <textarea
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="Add note..."
-                      className="input-field mt-1 min-h-[80px]"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" className="btn-primary">
-                      Acknowledge
-                    </button>
-                    <button type="button" className="btn-secondary">
-                      Mark resolved
-                    </button>
-                  </div>
-                </div>
-              );
-            })()
+          {selected ? (
+            <div className="animate-slide-in-right space-y-4">
+              <div>
+                <p className="text-sm font-medium text-slate-700">
+                  {selected.patientName ?? selected.patientId} · {selected.vitalType}
+                </p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {formatValue(selected)} {selected.unit}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Flagged {formatDate(selected.createdAt)} · SLA due{" "}
+                  {formatDate(selected.slaDueAt)}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  Clinical note
+                </label>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add note..."
+                  className="input-field mt-1 min-h-[80px]"
+                  rows={3}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={updateMutation.isPending}
+                  onClick={() =>
+                    updateMutation.mutate({
+                      id: selected.id,
+                      state: "acknowledged",
+                      clinicalNote: note || undefined,
+                    })
+                  }
+                >
+                  Acknowledge
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={updateMutation.isPending}
+                  onClick={() =>
+                    updateMutation.mutate({
+                      id: selected.id,
+                      state: "resolved",
+                      clinicalNote: note || undefined,
+                    })
+                  }
+                >
+                  Mark resolved
+                </button>
+              </div>
+            </div>
           ) : (
             <p className="text-sm text-slate-500">
               Select an alert to view details and take action.

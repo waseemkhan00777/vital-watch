@@ -10,10 +10,11 @@ export default function CaregiverLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    if (isLoading) return;
     if (!isAuthenticated || !user) {
       router.replace("/login");
       return;
@@ -21,9 +22,9 @@ export default function CaregiverLayout({
     if (user.role !== "caregiver") {
       router.replace("/login");
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, isLoading, router]);
 
-  if (!user || user.role !== "caregiver") {
+  if (isLoading || !user || user.role !== "caregiver") {
     return null;
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import type { Role } from "@/lib/types";
 
@@ -17,6 +17,7 @@ const PATIENT_NAV = [
 const CLINICIAN_NAV = [
   { href: "/clinician", label: "Alerts" },
   { href: "/clinician/patients", label: "Patients" },
+  { href: "/clinician/vitals", label: "Vitals" },
 ];
 
 const ADMIN_NAV = [
@@ -29,6 +30,7 @@ const ADMIN_NAV = [
 const CAREGIVER_NAV = [
   { href: "/caregiver", label: "Dashboard" },
   { href: "/caregiver/vitals", label: "Vitals (view only)" },
+  { href: "/caregiver/alerts", label: "Alerts (view only)" },
 ];
 
 function getNav(role: Role): { href: string; label: string }[] {
@@ -54,8 +56,13 @@ export function AppShell({
   role: Role;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const nav = getNav(role);
+
+  const handleLogout = () => {
+    logout().then(() => router.push("/login"));
+  };
 
   return (
     <div className="flex min-h-screen bg-surface-paper">
@@ -110,7 +117,7 @@ export function AppShell({
           </p>
           <button
             type="button"
-            onClick={() => logout()}
+            onClick={handleLogout}
             className="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm text-slate-600 transition-colors hover:bg-slate-100"
           >
             Sign out

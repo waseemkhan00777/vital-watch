@@ -1,22 +1,9 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
-
-const MOCK_AUDIT = [
-  {
-    id: "1",
-    action: "vitals.submit",
-    timestamp: "2025-03-02T14:30:00Z",
-    resourceType: "vitals",
-    ip: "192.168.1.1",
-  },
-  {
-    id: "2",
-    action: "auth.login",
-    timestamp: "2025-03-02T14:00:00Z",
-    resourceType: "session",
-    ip: "192.168.1.1",
-  },
-];
+import { auditApi } from "@/lib/api";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -26,6 +13,11 @@ function formatDate(iso: string) {
 }
 
 export default function PatientAuditPage() {
+  const { data: logs = [], isLoading, error } = useQuery({
+    queryKey: ["audit", "patient"],
+    queryFn: () => auditApi.list({ limit: 100 }),
+  });
+
   return (
     <>
       <PageHeader
@@ -37,30 +29,48 @@ export default function PatientAuditPage() {
           title="Audit log"
           description="Patient-visible access log per HIPAA alignment."
         />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-600">
-                <th className="pb-3 font-medium">Time</th>
-                <th className="pb-3 font-medium">Action</th>
-                <th className="pb-3 font-medium">Resource</th>
-                <th className="pb-3 font-medium">IP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_AUDIT.map((r) => (
-                <tr key={r.id} className="border-b border-slate-100">
-                  <td className="py-3 text-slate-600">
-                    {formatDate(r.timestamp)}
-                  </td>
-                  <td className="py-3 font-medium text-slate-900">{r.action}</td>
-                  <td className="py-3 text-slate-600">{r.resourceType}</td>
-                  <td className="py-3 text-slate-500">{r.ip}</td>
+        {isLoading && <p className="text-sm text-slate-600">Loading…</p>}
+        {error && (
+          <p className="text-sm text-red-600">
+            {error instanceof Error ? error.message : "Failed to load audit log."}
+          </p>
+        )}
+        {!isLoading && !error && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-600">
+                  <th className="pb-3 font-medium">Time</th>
+                  <th className="pb-3 font-medium">Action</th>
+                  <th className="pb-3 font-medium">Resource</th>
+                  <th className="pb-3 font-medium">IP</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-4 text-slate-500">
+                      No audit entries yet.
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((r) => (
+                    <tr key={r.id} className="border-b border-slate-100">
+                      <td className="py-3 text-slate-600">
+                        {formatDate(r.timestamp)}
+                      </td>
+                      <td className="py-3 font-medium text-slate-900">
+                        {r.resource}.{r.action}
+                      </td>
+                      <td className="py-3 text-slate-600">{r.resource}</td>
+                      <td className="py-3 text-slate-500">{r.ipAddress ?? "—"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </>
   );

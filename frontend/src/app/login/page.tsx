@@ -1,38 +1,72 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, isApiError } from "@/context/AuthContext";
 import type { Role } from "@/lib/types";
 
-const ROLES: { value: Role; label: string }[] = [
-  { value: "patient", label: "Patient" },
-  { value: "clinician", label: "Clinician / Nurse" },
-  { value: "admin", label: "Admin" },
-  { value: "caregiver", label: "Caregiver" },
-];
+function redirectForRole(role: Role): string {
+  switch (role) {
+    case "admin":
+      return "/admin";
+    case "clinician":
+      return "/clinician";
+    case "caregiver":
+      return "/caregiver";
+    case "patient":
+    default:
+      return "/patient";
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("patient");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // When already logged in, redirect to the user's dashboard (persists across tabs and refreshes)
+  useEffect(() => {
+    if (isLoading) return;
+    if (isAuthenticated && user) {
+      router.replace(redirectForRole(user.role));
+    }
+  }, [isLoading, isAuthenticated, user, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email || "demo@vitalwatch.demo", password, role);
-    const redirect =
-      role === "admin"
-        ? "/admin"
-        : role === "clinician"
-          ? "/clinician"
-          : role === "caregiver"
-            ? "/caregiver"
-            : "/patient";
-    router.push(redirect);
+    setError(null);
+    if (!email.trim() || !password) {
+      setError("Please enter your email and password.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const user = await login(email.trim(), password);
+      router.push(redirectForRole(user.role));
+    } catch (err) {
+      if (isApiError(err)) {
+        setError(err.message || "Invalid email or password.");
+      } else {
+        setError("Unable to sign in. Check your connection.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  // Show nothing while loading or when redirecting (already logged in)
+  if (isLoading || (isAuthenticated && user)) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#f0fdfa]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+        <p className="mt-3 text-sm text-slate-600">Loading…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f0fdfa]">
@@ -77,7 +111,7 @@ export default function LoginPage() {
               Sign in
             </h1>
             <p className="mt-1.5 text-sm text-slate-600">
-              Choose your role to enter the demo portal.
+              Enter your email and password. You will be taken to the dashboard for your account type.
             </p>
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-5">
@@ -115,35 +149,19 @@ export default function LoginPage() {
                   autoComplete="current-password"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  Sign in as
-                </label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {ROLES.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setRole(r.value)}
-                      className={`rounded-xl border px-3.5 py-2 text-sm font-medium transition-all duration-200 ${
-                        role === r.value
-                          ? "border-primary-500 bg-primary-50 text-primary-700 shadow-sm"
-                          : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:bg-slate-50"
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button type="submit" className="btn-primary w-full">
-                Continue
+              {error && (
+                <p className="text-sm text-red-600" role="alert">
+                  {error}
+                </p>
+              )}
+              <button
+                type="submit"
+                className="btn-primary w-full"
+                disabled={submitting}
+              >
+                {submitting ? "Signing in…" : "Sign in"}
               </button>
             </form>
-
-            <p className="mt-6 text-center text-xs text-slate-500">
-              Demo: no password required. Role determines dashboard.
-            </p>
           </div>
         </div>
       </main>

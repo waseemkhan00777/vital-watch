@@ -5,6 +5,7 @@ import {
   vitalSubmissionSchema,
   type VitalSubmission,
 } from "@/lib/vitals-schema";
+import { vitalsApi } from "@/lib/api";
 
 const VITAL_OPTIONS: { type: VitalSubmission["type"]; label: string }[] = [
   { type: "blood_pressure", label: "Blood pressure (mmHg)" },
@@ -47,7 +48,7 @@ export function VitalForm({ onSuccess }: { onSuccess: () => void }) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     const payload = buildPayload();
@@ -60,8 +61,16 @@ export function VitalForm({ onSuccess }: { onSuccess: () => void }) {
       setError(parsed.error.errors.map((e) => e.message).join(" "));
       return;
     }
-    // Demo: no API yet
-    onSuccess();
+    try {
+      await vitalsApi.submit(payload as Record<string, unknown>);
+      onSuccess();
+    } catch (err: unknown) {
+      setError(
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : "Failed to submit reading."
+      );
+    }
   };
 
   return (
