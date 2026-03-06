@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>VitalCare.Abp</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Ddd.Domain" Version="8.2.0" />
+    <ProjectReference Include="..\VitalCare.Abp.Domain.Shared\VitalCare.Abp.Domain.Shared.csproj" />
+  </ItemGroup>
+</Project>
