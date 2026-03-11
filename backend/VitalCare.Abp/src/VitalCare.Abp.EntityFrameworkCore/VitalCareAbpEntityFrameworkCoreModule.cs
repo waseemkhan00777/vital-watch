@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore.PostgreSql;
@@ -15,10 +16,18 @@ public class VitalCareAbpEntityFrameworkCoreModule : AbpModule
 {
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
+        // Register the RLS interceptor as Singleton (IHttpContextAccessor is AsyncLocal-safe from Singleton)
+        context.Services.AddSingleton<RlsSessionInterceptor>();
+
         context.Services.AddAbpDbContext<VitalCareAbpDbContext>(options =>
         {
             options.AddDefaultRepositories(includeAllEntities: true);
             options.AddRepository<User, EfCoreUserRepository>();
+            options.AddRepository<Session, EfCoreSessionRepository>();
+            options.AddRepository<RefreshToken, EfCoreRefreshTokenRepository>();
+            options.AddRepository<FirstLoginToken, EfCoreFirstLoginTokenRepository>();
+            options.AddRepository<FailedLoginAttempt, EfCoreFailedLoginAttemptRepository>();
+            options.AddRepository<PasswordResetToken, EfCorePasswordResetTokenRepository>();
             options.AddRepository<AlertRule, EfCoreAlertRuleRepository>();
             options.AddRepository<CaregiverLink, EfCoreCaregiverLinkRepository>();
             options.AddRepository<VitalReading, EfCoreVitalReadingRepository>();
@@ -28,9 +37,19 @@ public class VitalCareAbpEntityFrameworkCoreModule : AbpModule
 
         Configure<AbpDbContextOptions>(options =>
         {
-            options.UseNpgsql(builder =>
+            options.Configure<VitalCareAbpDbContext>(ctx =>
             {
-                builder.MigrationsAssembly(typeof(VitalCareAbpEntityFrameworkCoreModule).Assembly.GetName().Name);
+                // Use ABP's PostgreSQL extension directly on ctx (not ctx.DbContextOptions)
+                ctx.UseNpgsql(builder =>
+                {
+                    builder.MigrationsAssembly(typeof(VitalCareAbpEntityFrameworkCoreModule).Assembly.GetName().Name);
+                });
+
+                // Activate Row-Level Security: sets app.user_id and app.user_role on each connection
+                // ctx.DbContextOptions is DbContextOptionsBuilder<VitalCareAbpDbContext>
+                ctx.DbContextOptions.AddInterceptors(
+                    ctx.ServiceProvider.GetRequiredService<RlsSessionInterceptor>()
+                );
             });
         });
     }

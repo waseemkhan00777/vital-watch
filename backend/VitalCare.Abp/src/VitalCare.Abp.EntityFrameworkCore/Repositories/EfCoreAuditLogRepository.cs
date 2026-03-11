@@ -13,13 +13,14 @@ public class EfCoreAuditLogRepository : EfCoreRepository<VitalCareAbpDbContext, 
     {
     }
 
-    public async Task<List<AuditLog>> GetListAsync(Guid? userId, string? resource, string? resourceId, DateTime? from, DateTime? to, int take, CancellationToken cancellationToken = default)
+    public async Task<List<AuditLog>> GetListAsync(Guid? userId, string? resource, string? resourceId, Guid? patientId, DateTime? from, DateTime? to, int take, CancellationToken cancellationToken = default)
     {
         var query = await GetQueryableAsync();
         var q = query.AsQueryable();
         if (userId.HasValue) q = q.Where(a => a.UserId == userId);
         if (!string.IsNullOrEmpty(resource)) q = q.Where(a => a.Resource == resource);
         if (!string.IsNullOrEmpty(resourceId)) q = q.Where(a => a.ResourceId == resourceId);
+        if (patientId.HasValue) q = q.Where(a => a.PatientId == patientId);
         if (from.HasValue) q = q.Where(a => a.Timestamp >= from.Value);
         if (to.HasValue) q = q.Where(a => a.Timestamp <= to.Value);
         return await q.OrderByDescending(a => a.Timestamp).Take(take).ToListAsync(cancellationToken);

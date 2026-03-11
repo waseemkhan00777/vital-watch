@@ -8,6 +8,11 @@ namespace VitalCare.Abp;
 public class VitalCareAbpDbContext : AbpDbContext<VitalCareAbpDbContext>
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<FirstLoginToken> FirstLoginTokens => Set<FirstLoginToken>();
+    public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<VitalReading> VitalReadings => Set<VitalReading>();
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<AlertRule> AlertRules => Set<AlertRule>();
@@ -30,6 +35,49 @@ public class VitalCareAbpDbContext : AbpDbContext<VitalCareAbpDbContext>
             e.Property(x => x.Email).HasMaxLength(256);
             e.Property(x => x.Role).HasMaxLength(32);
             e.Property(x => x.Name).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<Session>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.TokenHash);
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.ExpiresAt);
+            e.Property(x => x.TokenHash).HasMaxLength(64);
+            e.Property(x => x.CsrfTokenHash).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.TokenHash);
+            e.HasIndex(x => new { x.UserId, x.ExpiresAt });
+            e.Property(x => x.TokenHash).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<FirstLoginToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.TempTokenHash);
+            e.HasIndex(x => x.ExpiresAt);
+            e.Property(x => x.TempTokenHash).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<FailedLoginAttempt>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.Email, x.FailedAt });
+            e.Property(x => x.Email).HasMaxLength(256);
+            e.Property(x => x.IpAddress).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<PasswordResetToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.TokenHash);
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.ExpiresAt);
+            e.Property(x => x.TokenHash).HasMaxLength(64);
         });
 
         modelBuilder.Entity<VitalReading>(e =>
@@ -79,8 +127,13 @@ public class VitalCareAbpDbContext : AbpDbContext<VitalCareAbpDbContext>
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.UserId, x.Timestamp });
             e.HasIndex(x => x.Resource);
+            e.HasIndex(x => x.PatientId);
             e.Property(x => x.Resource).HasMaxLength(64);
             e.Property(x => x.Action).HasMaxLength(32);
+            e.Property(x => x.ResourceType).HasMaxLength(64);
+            e.Property(x => x.DataType).HasMaxLength(64);
+            e.Property(x => x.DataId).HasMaxLength(64);
+            e.Property(x => x.AccessedFields).HasMaxLength(512);
             e.Property(x => x.UserEmail).HasMaxLength(256);
             e.Property(x => x.Role).HasMaxLength(32);
         });

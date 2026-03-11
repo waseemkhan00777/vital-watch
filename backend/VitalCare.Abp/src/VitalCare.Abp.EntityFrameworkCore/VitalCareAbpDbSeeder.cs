@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using VitalCare.Abp.Entities;
 using VitalCare.Abp.Repositories;
@@ -9,17 +11,20 @@ public static class VitalCareAbpDbSeeder
 {
     public static async Task SeedAsync(IServiceProvider serviceProvider)
     {
+        var env = serviceProvider.GetRequiredService<IHostEnvironment>();
+        var logger = serviceProvider.GetRequiredService<ILogger<VitalCareAbpDbContext>>();
+
+        if (!env.IsDevelopment())
+        {
+            logger.LogInformation("Skipping database seeding: not running in Development environment.");
+            return;
+        }
+
         var db = serviceProvider.GetRequiredService<VitalCareAbpDbContext>();
         var userRepo = serviceProvider.GetRequiredService<IUserRepository>();
         var ruleRepo = serviceProvider.GetRequiredService<IAlertRuleRepository>();
-        var encryption = serviceProvider.GetService<IEncryptionService>();
-        var logger = serviceProvider.GetRequiredService<ILogger<VitalCareAbpDbContext>>();
-
-        if (encryption == null)
-        {
-            logger.LogWarning("IEncryptionService not registered; seeding with plain names.");
-            encryption = new PlainEncryptionService();
-        }
+        var encryption = serviceProvider.GetRequiredService<IEncryptionService>();
+        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
 
         if (await userRepo.FindByEmailAsync("admin@vitalwatch.demo") != null)
         {
@@ -27,12 +32,23 @@ public static class VitalCareAbpDbSeeder
             return;
         }
 
+        // Passwords are read from configuration (user-secrets or environment variables).
+        // Set via: dotnet user-secrets set "Seed:AdminPassword" "<strong-password>"
+        var adminPwd = configuration["Seed:AdminPassword"]
+            ?? throw new InvalidOperationException("Seed:AdminPassword is not configured. Set it via user-secrets or environment variable Seed__AdminPassword.");
+        var clinicianPwd = configuration["Seed:ClinicianPassword"]
+            ?? throw new InvalidOperationException("Seed:ClinicianPassword is not configured.");
+        var patientPwd = configuration["Seed:PatientPassword"]
+            ?? throw new InvalidOperationException("Seed:PatientPassword is not configured.");
+        var caregiverPwd = configuration["Seed:CaregiverPassword"]
+            ?? throw new InvalidOperationException("Seed:CaregiverPassword is not configured.");
+
         var users = new[]
         {
-            (Email: "admin@vitalwatch.demo", Password: "admin123", Name: "Admin", Role: "admin"),
-            (Email: "nurse@vitalwatch.demo", Password: "nurse123", Name: "Nurse", Role: "clinician"),
-            (Email: "patient@vitalwatch.demo", Password: "patient123", Name: "Patient", Role: "patient"),
-            (Email: "caregiver@vitalwatch.demo", Password: "caregiver123", Name: "Caregiver", Role: "caregiver")
+            (Email: "admin@vitalwatch.demo", Password: adminPwd, Name: "Admin", Role: "admin"),
+            (Email: "nurse@vitalwatch.demo", Password: clinicianPwd, Name: "Nurse", Role: "clinician"),
+            (Email: "patient@vitalwatch.demo", Password: patientPwd, Name: "Patient", Role: "patient"),
+            (Email: "caregiver@vitalwatch.demo", Password: caregiverPwd, Name: "Caregiver", Role: "caregiver")
         };
 
         foreach (var u in users)
@@ -43,7 +59,9 @@ public static class VitalCareAbpDbSeeder
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(u.Password),
                 Name = encryption.Encrypt(u.Name),
                 Role = u.Role,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                // Require a password change on first login for all seeded accounts
+                MustChangePassword = true
             };
             await userRepo.InsertAsync(user);
         }
@@ -75,11 +93,5 @@ public static class VitalCareAbpDbSeeder
 
         await db.SaveChangesAsync();
         logger.LogInformation("Seed completed.");
-    }
-
-    private sealed class PlainEncryptionService : IEncryptionService
-    {
-        public string Encrypt(string plainText) => plainText;
-        public string Decrypt(string cipherText) => cipherText;
     }
 }

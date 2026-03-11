@@ -1,5 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using VitalCare.Abp;
@@ -9,7 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseAutofac();
 await builder.AddApplicationAsync<VitalCareAbpHttpApiHostModule>();
 
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "VitalCareSecretKeyAtLeast32CharactersLong!";
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException("JWT signing key is not configured. Set the Jwt:Key environment variable (e.g. JWT__Key).");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -31,13 +35,55 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (ctx.Request.Cookies.TryGetValue("access_token", out var token))
                     ctx.Token = token;
                 return Task.CompletedTask;
+            },
+            OnTokenValidated = async ctx =>
+            {
+                var token = ctx.Request.Headers.Authorization.FirstOrDefault()?.Split(' ', 2).LastOrDefault()
+                    ?? (ctx.Request.Cookies.TryGetValue("access_token", out var c) ? c : null);
+                if (string.IsNullOrEmpty(token)) return;
+                var sessionsService = ctx.HttpContext.RequestServices.GetService<ISessionsService>();
+                if (sessionsService == null) return;
+                if (!await sessionsService.IsSessionValidAsync(token, ctx.HttpContext.RequestAborted))
+                {
+                    ctx.Fail(new UnauthorizedAccessException("Session invalid or expired."));
+                    return;
+                }
+                _ = Task.Run(() => sessionsService.UpdateActivityAsync(token, default));
             }
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Authentication endpoints: 5 attempts per 15 minutes (brute-force protection)
+    options.AddFixedWindowLimiter("auth", config =>
+    {
+        config.Window = TimeSpan.FromMinutes(15);
+        config.PermitLimit = 5;
+        config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        config.QueueLimit = 0;
+    });
+
+    // General API endpoints: 100 requests per minute
+    options.AddFixedWindowLimiter("api", config =>
+    {
+        config.Window = TimeSpan.FromMinutes(1);
+        config.PermitLimit = 100;
+        config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        config.QueueLimit = 0;
+    });
+});
 
 var app = builder.Build();
 await app.InitializeApplicationAsync();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+app.UseHttpsRedirection();
 
 if (app.Environment.IsDevelopment())
 {

@@ -6,6 +6,7 @@ public static class VitalCareAbpConstants
     {
         public const string Admin = "admin";
         public const string Clinician = "clinician";
+        public const string CareCoordinator = "care_coordinator";
         public const string Patient = "patient";
         public const string Caregiver = "caregiver";
     }

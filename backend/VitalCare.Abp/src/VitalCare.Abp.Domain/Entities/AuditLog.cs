@@ -10,6 +10,11 @@ public class AuditLog : BasicAggregateRoot<Guid>
     public string Resource { get; set; } = string.Empty;
     public string Action { get; set; } = string.Empty;
     public string? ResourceId { get; set; }
+    public string? ResourceType { get; set; }
+    public string? DataType { get; set; }
+    public string? DataId { get; set; }
+    public Guid? PatientId { get; set; }
+    public string? AccessedFields { get; set; }
     public string? Details { get; set; }
     public string? IpAddress { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;

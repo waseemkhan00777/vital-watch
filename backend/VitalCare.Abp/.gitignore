@@ -47,10 +47,14 @@ artifacts/
 # User-specific and secrets
 *.rsuser
 *.userprefs
+appsettings.Development.json
 appsettings.*.local.json
 appsettings.*.local.*
 secrets.json
 *.pfx
+*.p12
+.env
+.env.*
 
 # Test and coverage
 [Tt]est[Rr]esult*/
@@ -70,6 +74,13 @@ secrets.json
 *.tmp
 *.temp
 *.cache
+
+# Publish output
+publish/
+**/publish/
+
+# Docker local data
+postgres_data/
 
 # Local tool manifest (optional; uncomment if you want to ignore local dotnet tools)
 # .config/dotnet-tools.json

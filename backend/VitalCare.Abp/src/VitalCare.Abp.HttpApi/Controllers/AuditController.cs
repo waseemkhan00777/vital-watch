@@ -20,11 +20,12 @@ public class AuditController : ControllerBase
         [FromQuery] Guid? userId,
         [FromQuery] string? resource,
         [FromQuery] string? resourceId,
+        [FromQuery] Guid? patientId,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         CancellationToken cancellationToken)
     {
-        var list = await _auditAppService.GetListAsync(userId, resource, resourceId, from, to, cancellationToken);
+        var list = await _auditAppService.GetListAsync(userId, resource, resourceId, patientId, from, to, cancellationToken);
         return Ok(list);
     }
 }

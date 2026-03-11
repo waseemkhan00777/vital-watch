@@ -9,6 +9,15 @@ public class User : BasicAggregateRoot<Guid>
     public string Role { get; set; } = "patient";
     public string Name { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool Active { get; set; } = true;
+    public bool MustChangePassword { get; set; }
+
+    /// <summary>
+    /// Timestamp of the last successful password set/change/reset.
+    /// Null for accounts created before this field was added.
+    /// Used to enforce the 90-day password expiration policy (HIPAA § 164.308(a)(5)).
+    /// </summary>
+    public DateTime? PasswordChangedAt { get; set; }
 
     public ICollection<VitalReading> VitalReadings { get; set; } = new List<VitalReading>();
     public ICollection<Alert> AlertsAcknowledged { get; set; } = new List<Alert>();
